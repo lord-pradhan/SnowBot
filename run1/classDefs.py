@@ -244,5 +244,5 @@ class Arduino:
 
 	def serialisation(self, serial_input):
         """decode serial input"""
-
+        # get code from SK
         self.state = ##something##
