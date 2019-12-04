@@ -214,9 +214,6 @@ class Path:
     # def moveIn(self):
 
 
-
-
-
 ###---- Measurement state  -----####
 class Measurement:
 
@@ -234,11 +231,9 @@ class Measurement:
 class Arduino:
 
 	def __init__(self, serial_input):
-		
 		serialisation(serial_input)
 
 	def getLocn(self):
-
         # self.state = serialisation(serial_input)        
         return state.x, state.y, state.theta
 
