@@ -242,14 +242,14 @@ class Measurement:
 if __name__ == '__main__':
     
     count=0
-    snowbot = SnowBot(0, 0.82 ,1.57)
+    snowbot = SnowBot(0, 0 ,1.57)
     path = Path()
     controller = Controller(snowbot, path)    
     measurement =Measurement(snowbot)
     sensorfusion = SensorFusion()
 
     x_list = []; y_list =[]; theta_list = []; w_l_list = []; w_r_list = []
-    n_ct = 7000
+    n_ct = 70
 
     while count <n_ct:
 

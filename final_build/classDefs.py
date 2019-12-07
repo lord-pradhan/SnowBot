@@ -26,6 +26,8 @@ class SnowBot:
         self.Q_actual = np.array([[1e-3, 0, 0], [0, 1e-3, 0], [0, 0, 1e-5]])
         self.R_actual = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-3]])
 
+        self.home_x = -10; self.home_y = 0
+
 
     ###---- State Class -----####
     class State:
@@ -39,7 +41,7 @@ class SnowBot:
 ###---- Controller Class -----####
 class Controller:
 
-    def __init__(self, snowbot, path):
+    def __init__(self, snowbot, path, mark):
 
         #control parameters
         self.L = 0.7  #bounding box length
@@ -60,74 +62,122 @@ class Controller:
             self.in_flag = 0
         else:
             self.in_flag = 1
+
+        # initialise flag for dump
+        self.dumped_flag=0
+        self.home_flag = 0
         
 
-    def control_update(self, snowbot, path):
+    def control_update(self, snowbot, path, mark, mode = 0):
 
-        #initialise variables
-        gamma_prev = self.gamma_prev
         x = snowbot.state.x; y = snowbot.state.y; theta = snowbot.state.theta
         x_p = snowbot.x_p
-        v_bot = self.v_bot; L = self.L; k_p=self.k_p; search=self.search
-        block = self.block
-        pathnum = path.pathnum
-
-        # Nonlinear guidance law path-following controller
-
-        x_d_ref=Path().x_d;  y_d_ref=Path().y_d
-
-        # block prev path
-        x_d_ref[wrappath(np.arange(gamma_prev - block, gamma_prev), path)] = 1e8
-        y_d_ref[wrappath(np.arange(gamma_prev - block, gamma_prev), path)] = 1e8
+        v_bot = self.v_bot
 
         # plow transform
         X_plow = x + x_p * np.cos( theta );  Y_plow = y + x_p * np.sin( theta )
 
-        # block future path
-        x_d_ref[wrappath(np.arange(gamma_prev+search,gamma_prev+search+block), path)] = 1e8
-        y_d_ref[wrappath(np.arange(gamma_prev+search,gamma_prev+search+block), path)] = 1e8
+        if mode ==0: # normal operation
 
-        # find d_min, gamma_min
-        d_min, gamma_min = closest_node(X_plow, Y_plow, np.array([x_d_ref, y_d_ref]).T )
+            #initialise variables
+            gamma_prev = self.gamma_prev
+            
+            L = self.L; k_p=self.k_p; search=self.search
+            block = self.block
 
-        x_d_ref2=Path().x_d;  y_d_ref2=Path().y_d
+            # Nonlinear guidance law path-following controller
+            x_d_ref=Path(snowbot, mark).x_d;  y_d_ref=Path(snowbot, mark).y_d
 
-        # find VTP
-        if d_min > L:
-            gamma_vtp = gamma_min
-            self.in_flag = 1
+            # block prev path
+            x_d_ref[wrappath(np.arange(gamma_prev - block, gamma_prev), path)] = 1e8
+            y_d_ref[wrappath(np.arange(gamma_prev - block, gamma_prev), path)] = 1e8
+
+            # block future path
+            x_d_ref[wrappath(np.arange(gamma_prev+search,gamma_prev+search+block), path)] = 1e8
+            y_d_ref[wrappath(np.arange(gamma_prev+search,gamma_prev+search+block), path)] = 1e8
+
+            # find d_min, gamma_min
+            d_min, gamma_min = closest_node(X_plow, Y_plow, np.array([x_d_ref, y_d_ref]).T )
+
+            x_d_ref2=Path(snowbot, mark).x_d;  y_d_ref2=Path(snowbot, mark).y_d
+
+            # find VTP
+            if d_min > L:
+                gamma_vtp = gamma_min
+                self.in_flag = 1
+
+            else:
+                ind = wrappath(np.arange(gamma_min-block, gamma_min), path)
+                print(ind)
+                x_d_ref2[ind] = 1e8
+                y_d_ref2[ind] = 1e8
+                qty2 = np.abs(np.sqrt((x_d_ref2 - X_plow)**2 + (y_d_ref2 - Y_plow)**2 ) - L) 
+                gamma_vtp = np.argmin(qty2)
+                self.in_flag = 0
+
+            # check discontinuity
+            # if LA.norm( np.array([[ x_d_ref[wrappath(gamma_vtp,path)] ],[ y_d_ref[wrappath(gamma_vtp,path)]] ]) - \
+            #     np.array([[ x_d_ref[wrappath(gamma_vtp+1,path)] ],[ y_d_ref[wrappath(gamma_vtp+1,path)]] ])  ) >= L:
+
+            #     gamma_vtp= gamma_vtp+1
+
+            # else:
+            #     pass
+
+            # check atan2 defined or not
+            if (Path(snowbot, mark).y_d[wrappath(gamma_vtp, path)] - Y_plow == 0.0) \
+            and (Path(snowbot, mark).x_d[wrappath(gamma_vtp,path)] - X_plow == 0.0):
+                deltad = 0
+                print('atan2 not defined')
+
+            else:
+                # calculate theta_ref
+                theta_ref = np.arctan2( Path(snowbot, mark).y_d[wrappath(gamma_vtp, path)] \
+                    - Y_plow , Path(snowbot, mark).x_d[wrappath(gamma_vtp,path)] - X_plow  )
+                # print(theta_ref)
+                deltad = theta - theta_ref
+
+            w_r = float(( v_bot - k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
+            w_l = float(( v_bot + k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
+
+            self.gamma_prev = gamma_min
+
+        # for dump manouver
+        elif mode ==1:
+            L_dump = 0.05
+
+            x_d_ref = Path(snowbot, mark=0).x_d
+            y_d_ref = Path(snowbot, mark=0).y_d
+
+            d_min, gamma_min = closest_node(X_plow, Y_plow, np.array([x_d_ref, y_d_ref]).T )
+
+            if d_min > L_dump:
+                gamma_vtp = gamma_min
+
+                theta_ref = np.arctan2( y_d[gamma_vtp] - Y_plow , x_d[gamma_vtp] - X_plow )
+                deltad = theta - theta_ref
+
+                w_r = float(( v_bot - k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
+                w_l = float(( v_bot + k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
+
+            else:
+                self.dumped_flag = 1
+                w_r = 0
+                w_l = 0
 
         else:
-            ind = wrappath(np.arange(gamma_min-block, gamma_min), path)
-            print(ind)
-            x_d_ref2[ind] = 1e8
-            y_d_ref2[ind] = 1e8
-            qty2 = np.abs(np.sqrt((x_d_ref2 - X_plow)**2 + (y_d_ref2 - Y_plow)**2 ) - L) 
-            gamma_vtp = np.argmin(qty2)
-            self.in_flag = 0
+            dist = np.array([X_plow, Y_plow]).T - np.array([snowbot.home_x,snowbot.home_y ]).T
+            d_home = np.sum(np ** 2, axis=1)
+            if (d_home > 0.1):
+                theta_ref = np.arctan2( y_d[gamma_vtp] - Y_plow , x_d[gamma_vtp] - X_plow )
+                deltad = theta - theta_ref
+                w_r = float(( v_bot - k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
+                w_l = float(( v_bot + k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
 
-        # check discontinuity
-        # if LA.norm( np.array([[ x_d_ref[wrappath(gamma_vtp,path)] ],[ y_d_ref[wrappath(gamma_vtp,path)]] ]) - \
-        #     np.array([[ x_d_ref[wrappath(gamma_vtp+1,path)] ],[ y_d_ref[wrappath(gamma_vtp+1,path)]] ])  ) >= L:
-
-        #     gamma_vtp= gamma_vtp+1
-
-        # else:
-        #     pass
-
-        # check atan2 defined or not
-        if (Path().y_d[wrappath(gamma_vtp, path)] - Y_plow == 0.0) and (Path().x_d[wrappath(gamma_vtp,path)] - X_plow == 0.0):
-            deltad = 0
-            print('atan2 not defined')
-
-        else:
-            # calculate theta_ref
-            theta_ref = np.arctan2( Path().y_d[wrappath(gamma_vtp, path)] - Y_plow , Path().x_d[wrappath(gamma_vtp,path)] - X_plow  )
-            # print(theta_ref)
-            deltad = theta - theta_ref
-
-        w_r = float(( v_bot - k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
-        w_l = float(( v_bot + k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
+            else:
+                self.home_flag=1
+                w_r = 0
+                w_l = 0
 
 
         #include RPM thresholds
@@ -144,9 +194,7 @@ class Controller:
             w_l = -self.w_max
 
         snowbot.w_r = w_r
-        snowbot.w_l = w_l
-
-        self.gamma_prev = gamma_min
+        snowbot.w_l = w_l            
 
 
 ####---- Sensor Fusion Class -----####
@@ -209,21 +257,25 @@ class SensorFusion:
 ###---- Class that contains path information -----####
 class Path:
 
-    def __init__(self):
+    def __init__(self, snowbot, mark=1):
 
-        self.a_el1 = 8; self.a_el2 = 4  # major axis
-        self.b_el1 = 6; self.b_el2 = 2  # minor axis
-        self.n_spacing = 400
+        self.a_boundary = 8; self.b_boundary = 6
+
+        self.a_el1 = self.a_boundary - mark*snowbot.c;  # major axis
+        self.b_el1 = self.b_boundary - mark*snowbot.c;  # minor axis
+
+        self.n_spacing = 200
 
         self.x_d = np.concatenate( (np.linspace(-self.a_el1, self.a_el1, self.n_spacing) ,\
         np.linspace(self.a_el1, -self.a_el1, self.n_spacing) ) , axis = 0 )      #needs to be a 1D array
         self.y_d = np.concatenate( (self.b_el1*np.sqrt(1 - np.square(self.x_d[0:self.n_spacing]/self.a_el1 ) ) , \
         -self.b_el1*np.sqrt(1 - np.square(self.x_d[self.n_spacing:]/self.a_el1 ) ) ) , axis=0)
 
-    # def moveIn(self):
+        self.gamma_dump = np.arange(250,300)
 
-
-
+        if mark==0:
+            self.x_d = self.x_d[gamma_dump]
+            self.y_d = self.y_d[gamma_dump]
 
 
 ###---- Measurement state  -----####

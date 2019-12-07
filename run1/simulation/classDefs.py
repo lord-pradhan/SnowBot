@@ -47,8 +47,8 @@ from usefulFuncs import *
 class Controller:
 
     #control parameters
-    L = 0.5  #bounding box length
-    k_p = 0.8  #gain
+    L = 0.3  #bounding box length
+    k_p = 3  #gain
     v_target = 0.1
 
     def __init__(self, snowbot, path):
@@ -110,13 +110,13 @@ class Controller:
             gamma_vtp = np.argmin(qty2)
 
         # check discontinuity
-        # if LA.norm( np.array([[ x_d_ref[wrappath(gamma_vtp,path)] ],[ y_d_ref[wrappath(gamma_vtp,path)]] ]) - \
-        #     np.array([[ x_d_ref[wrappath(gamma_vtp+1,path)] ],[ y_d_ref[wrappath(gamma_vtp+1,path)]] ])  ) >= L:
+        if LA.norm( np.array([[ x_d_ref[wrappath(gamma_vtp,path)] ],[ y_d_ref[wrappath(gamma_vtp,path)]] ]) - \
+            np.array([[ x_d_ref[wrappath(gamma_vtp+1,path)] ],[ y_d_ref[wrappath(gamma_vtp+1,path)]] ])  ) >= L:
 
-        #     gamma_vtp= gamma_vtp+1
+            gamma_vtp= gamma_vtp+1
 
-        # else:
-        #     pass
+        else:
+            pass
 
         # check atan2 defined or not
         if (Path().y_d[wrappath(gamma_vtp, path)] - Y_plow == 0.0) and (Path().x_d[wrappath(gamma_vtp,path)] - X_plow == 0.0):
@@ -214,21 +214,22 @@ class SensorFusion:
 class Path:
 
     def __init__(self):
-##
-        self.a_el1 = 3; #self.a_el2 = 4  # major axis
-        self.b_el1 = 2; #self.b_el2 = 2  # minor axis
-        self.n_spacing = 400
 
-        self.x_d = np.concatenate( (np.linspace(-self.a_el1, self.a_el1, self.n_spacing) ,\
-        np.linspace(self.a_el1, -self.a_el1, self.n_spacing) ) , axis = 0 )      #needs to be a 1D array
-        self.y_d = np.concatenate( (self.b_el1*np.sqrt(1 - np.square(self.x_d[0:self.n_spacing]/self.a_el1 ) ) , \
-        -self.b_el1*np.sqrt(1 - np.square(self.x_d[self.n_spacing:]/self.a_el1 ) ) ) , axis=0)
+        # Elliptic figures
+#         self.a_el1 = 3; #self.a_el2 = 4  # major axis
+#         self.b_el1 = 2; #self.b_el2 = 2  # minor axis
+#         self.n_spacing = 400
 
-        
-        # self.n_spacing = 100
-        # self.x_d = np.concatenate( (np.linspace(-2.286, 3.25, self.n_spacing) ,\
-        #  np.linspace(3.25, -2.286, self.n_spacing) ) , axis = 0 )     #needs to be a 1D array
-        # self.y_d = np.zeros(2*self.n_spacing)
+#         self.x_d = np.concatenate( (np.linspace(-self.a_el1, self.a_el1, self.n_spacing) ,\
+#         np.linspace(self.a_el1, -self.a_el1, self.n_spacing) ) , axis = 0 )      #needs to be a 1D array
+#         self.y_d = np.concatenate( (self.b_el1*np.sqrt(1 - np.square(self.x_d[0:self.n_spacing]/self.a_el1 ) ) , \
+#         -self.b_el1*np.sqrt(1 - np.square(self.x_d[self.n_spacing:]/self.a_el1 ) ) ) , axis=0)
+
+        # Straight line
+        self.n_spacing = 200
+        self.x_d = np.concatenate( (np.linspace(-2*2.286, 2*3.25, self.n_spacing) ,\
+         np.linspace(2*3.25, -2*2.286, self.n_spacing) ) , axis = 0 )     #needs to be a 1D array
+        self.y_d = np.zeros(2*self.n_spacing)
 
 
 ###---- Measurement state  -----####

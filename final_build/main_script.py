@@ -12,21 +12,26 @@ if __name__ == '__main__':
 		if (Brain.checkEMButton == 1):
 			brain.EMProc()
 
-		else if Brain.checkReset == 1:
+		elif Brain.checkReset == 1:
 			brain.resetProc()
 
-		else if brain.state == 'init':
+		elif brain.state == 'init':
 			brain.initProc(serial_input)
 
-		else if brain.state == 'think':
+		elif brain.state == 'think':
 			brain.thinkProc(serial_input)
 
-		else if brain.state == 'driveD':
+		elif brain.state == 'driveD':
 			brain.driveDProc(serial_input)
 
-		else if brain.state == 'driveE':
+		elif brain.state == 'driveE':
 			brain.driveEProc(serial_input)
 
-		else if 
+		elif brain.state == 'dump':
+			brain.dumpProc(serial_input)
 
+		elif brain.state == 'goHome':
+			brain.goHomeProc(serial_input)
 
+		elif brain.state == 'done':
+			pass
