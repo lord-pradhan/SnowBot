@@ -16,40 +16,68 @@ class Brain:
 		self.mark = 0
 		# self.ct1 = 0
 
-	# def EMProc(self, snowbot):
+        self.x_pre = 0
+        self.y_pre = 0
+        self.theta_pre = 0
+        self.x_post = 0
+        self.y_post = 0
+        self.theta_post = 0
 
-	# 	self.snowbot.w_l = 0
-	# 	self.snowbot.w_r = 0
-	# 	self.snowbot.plow = 0
-	# 	self.state = 'stop'
 
-	# def resetProc(self, snowbot):
+	def initProc(self, ser, mpu):
 
-	# 	self.snowbot.w_l = 0
-	# 	self.snowbot.w_r = 0
-	# 	self.snowbot.plow = 0
-	# 	self.state = 'init'
+		# self.arduino = Arduino(serial_input)
+		# self.measurement = Measurement(arduino)
+		# self.snowbot = Snowbot(measurement)
+		
+		# self.path = Path(self.snowbot, self.mark)
+		# self.controller = Controller(self.snowbot, self.path, self.mark)
+		# self.sensorfusion = SensorFusion()
+		# self.state = 'think'
 
-	def initProc(self, serial_input):
-
-		self.arduino = Arduino(serial_input)
-		self.measurement = Measurement(arduino)
-		self.snowbot = Snowbot(measurement)
+		self.arduino = Arduino(ser)
 		self.mark = 1
-		self.path = Path(self.snowbot, self.mark)
-		self.controller = Controller(self.snowbot, self.path, self.mark)
-		self.sensorfusion = SensorFusion()
-		self.state = 'think'
 
-	def thinkProc(self, serial_input):
+        self.measurement = Measurement(self.arduino, mpu)
+
+        print('before EKF', self.measurement.x, self.measurement.y, self.measurement.theta)
+        self.x_pre = self.measurement.x
+        self.y_pre = self.measurement.y
+        self.theta_pre = self.measurement.theta
+
+        self.snowbot = SnowBot(self.measurement)
+        self.path = Path(self.snowbot, self.mark)
+        self.controller = Controller(self.snowbot, self.path, self.mark)
+        self.sensorfusion = SensorFusion()
+
+        print('after EKF', self.snowbot.state.x, self.snowbot.state.y, self.snowbot.state.theta)
+        self.x_post = self.snowbot.state.x
+        self.y_post = self.snowbot.state.y
+        self.theta_post = self.snowbot.state.theta
+        self.state = 'think'
+
+
+	def thinkProc(self, ser, mpu):
 
 		self.state = 'driveD'
 
 	def driveDProc(self, serial_input):
 
-		self.arduino.serialisation(serial_input)
-		self.measurement = measurementUpdate(self.arduino)
+		self.arduino.serialisation(ser)
+		self.measurement.measurementUpdate(self.arduino, mpu)
+
+		print('before EKF', self.measurement.x, self.measurement.y, self.measurement.theta)
+        self.x_pre = self.measurement.x
+        self.y_pre = self.measurement.y
+        self.theta_pre = self.measurement.theta
+
 		self.sensorfusion.state_update(self.snowbot, self.measurement)
+
+		print('after EKF', self.snowbot.state.x, self.snowbot.state.y, self.snowbot.state.theta)
+		self.x_post = self.snowbot.state.x
+        self.y_post = self.snowbot.state.y
+        self.theta_post = self.snowbot.state.theta
+
 		self.controller.control_update(self.snowbot, self.path, self.mark)
 
 		#check if reached boundary
@@ -61,9 +89,21 @@ class Brain:
 
 	def driveEProc(self, serial_input):
 
-		self.arduino.serialisation(serial_input)
-		self.measurement = measurementUpdate(self.arduino)
+		self.arduino.serialisation(ser)
+		self.measurement.measurementUpdate(self.arduino, mpu)
+
+		print('before EKF', self.measurement.x, self.measurement.y, self.measurement.theta)
+        self.x_pre = self.measurement.x
+        self.y_pre = self.measurement.y
+        self.theta_pre = self.measurement.theta
+
 		self.sensorfusion.state_update(self.snowbot, self.measurement)
+
+		print('after EKF', self.snowbot.state.x, self.snowbot.state.y, self.snowbot.state.theta)
+		self.x_post = self.snowbot.state.x
+        self.y_post = self.snowbot.state.y
+        self.theta_post = self.snowbot.state.theta
+
 		self.controller.control_update(self.snowbot, self.path, self.mark)
 
 		# check if finished loop
@@ -77,6 +117,7 @@ class Brain:
 			else:
 				self.mark -= 1
 
+		# check if reached dump location
 		if self.controller.gamma_prev - self.gamma_min > len(self.path.x_d) \
 		and np.isin(wrapPath(self.controller.gamma_prev), Path(self.snowbot,self.mark).gamma_dump):
 			
