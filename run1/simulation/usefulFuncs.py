@@ -17,14 +17,13 @@ def simulator( snowbot, controller):
 
 	# x = snowbot.state.x + dt * ( (w_l+w_r)*r*np.cos(theta)/2.0 + (w_r - w_l)*r*x0*np.sin(theta) )
 
-	x_out = snowbot.state.x + dt*( (w_l+w_r)*np.cos(theta)*r/(2.0) + (w_r - w_l)*np.sin(theta)*r*x0/(2.0*c) )
+	x_out = snowbot.state.x + dt*( (w_l+w_r)*np.cos(theta)*r/(2.0) + (w_r - w_l)*np.sin(theta)*r*x0/(2.0*c) )# + np.random.normal(0, 0.1, 1)
 
-	y_out = snowbot.state.y + dt*( (w_l+w_r)*np.sin(theta)*r/(2.0) - (w_r - w_l)*np.cos(theta)*r*x0/(2.0*c) )
+	y_out = snowbot.state.y + dt*( (w_l+w_r)*np.sin(theta)*r/(2.0) - (w_r - w_l)*np.cos(theta)*r*x0/(2.0*c) ) #+ np.random.normal(0, 0.1, 1)
 
-	theta_out = theta + dt*(w_r - w_l)*r/(2.0*c)
+	theta_out = theta + dt*(w_r - w_l)*r/(2.0*c) #+ np.random.normal(0, 0.01, 1)
 
 	return x_out, y_out, theta_out
-
 
 # vectorized find_nearest point
 def closest_node(X, Y, traj):

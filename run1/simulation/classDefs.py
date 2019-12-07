@@ -1,75 +1,66 @@
 import numpy as np
 import numpy.linalg as LA
-import matplotlib.pyplot as plt
 from usefulFuncs import *
+##from brain import *
 
-###---- Class that contains path information -----####
-class Path:
+## uncomment this
+# from DriveArduino import *
+# from MPU6050 import *
 
-    def __init__(self):
 
-        # self.a_el1 = 8; self.a_el2 = 4  # major axis
-        # self.b_el1 = 6; self.b_el2 = 2  # minor axis
-        # self.n_spacing = 400
-
-        # self.x_d = np.concatenate( (np.linspace(-self.a_el1, self.a_el1, self.n_spacing) ,\
-        # np.linspace(self.a_el1, -self.a_el1, self.n_spacing) ) , axis = 0 )      #needs to be a 1D array
-        # self.y_d = np.concatenate( (self.b_el1*np.sqrt(1 - np.square(self.x_d[0:self.n_spacing]/self.a_el1 ) ) , \
-        # -self.b_el1*np.sqrt(1 - np.square(self.x_d[self.n_spacing:]/self.a_el1 ) ) ) , axis=0)
-
-        self.n_spacing = 100
-        self.x_d = np.concatenate( (np.linspace(-self.a_el1, self.a_el1, self.n_spacing) ,\
-         np.linspace(self.a_el1, -self.a_el1, self.n_spacing) ) , axis = 0 )     #needs to be a 1D array
-        self.y_d = np.zeros(2*n_spacing)
 
 
 ###---- SnowBot Class -----####
-class SnowBot:
 
-    def __init__(self, x=0.0 , y=0.0 , theta=0.0):
+## Don't copy this back
+# class SnowBot:
 
-        self.w_l = 0.0
-        self.w_r = 0.0
+#     def __init__(self, measurement):
 
-        # geometric parameters
-        self.r = 0.13 #radius of wheel
-        self.w_wheel = 0.076 #wheel width
-        self.c = 0.534 #lateral width
-        self.x_p = 0.85 #plow offset
+#         self.w_l = 0.0
+#         self.w_r = 0.0
 
-        self.state = self.State(x,y,theta)
+#         # geometric parameters
+#         self.r = 0.13 #radius of wheel
+#         self.w_wheel = 0.076 #wheel width
+#         self.c = 0.534 #lateral width
+#         self.x_p = 0.85 #plow offset
 
-        self.x0_actual = 0.3 # x_ICR
+#         self.state = self.State(measurement.x , measurement.y , measurement.theta)
 
-        self.Q_actual = np.array([[1e-3, 0, 0], [0, 1e-3, 0], [0, 0, 1e-5]])
-        self.R_actual = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-3]])
+# ##        self.x0_actual = 0.1 # x_ICR
+# ##
+# ##        self.Q_actual = np.array([[1e-3, 0, 0], [0, 1e-3, 0], [0, 0, 1e-5]])
+# ##        self.R_actual = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-3]])
 
 
-    ###---- State Class -----####
-    class State:
+#     ###---- State Class -----####
+#     class State:
 
-        def __init__(self, x=0.0 , y= 0.0 , theta=0.0):
-            self.x = x
-            self.y = y
-            self.theta = theta
-
+#         def __init__(self, x=0.0 , y= 0.0 , theta=0.0):
+#             self.x = x
+#             self.y = y
+#             self.theta = theta
 
 
 ###---- Controller Class -----####
 class Controller:
 
     #control parameters
-    L = 0.7  #bounding box length
-    k_p = 3.0  #gain
+    L = 0.5  #bounding box length
+    k_p = 0.8  #gain
+    v_target = 0.1
 
     def __init__(self, snowbot, path):
 
         
-        self.dt_ctrl = 0.05
-        self.v_bot = 0.8
-        self.w_max = 60*np.pi*2/60.0
+        self.dt_ctrl = 0.3
+        self.w_max = 45*np.pi*2/60.0
+        self.v_bot = min(self.w_max*snowbot.r, self.v_target)
         self.block = np.floor(len(path.x_d)/10)
-        self.search = 200  #look-ahead for search
+        self.search = np.floor(len(path.x_d)/8)  #look-ahead for search
+
+        self.x_track = 0; self.y_track = 0
 
         # find initial gamma_prev 
         X_plow = snowbot.state.x + snowbot.x_p * np.cos( snowbot.state.theta )
@@ -138,6 +129,7 @@ class Controller:
             # print(theta_ref)
             deltad = theta - theta_ref
 
+        self.x_track = Path().x_d[wrappath(gamma_vtp,path)]; self.y_track = Path().y_d[wrappath(gamma_vtp,path)]
         w_r = float(( v_bot - k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
         w_l = float(( v_bot + k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
 
@@ -161,19 +153,19 @@ class Controller:
         self.gamma_prev = gamma_min
 
 
-###---- Sensor Fusion Class -----####
+####---- Sensor Fusion Class -----####
 class SensorFusion:
 
     #EKF parameters
-    Q_ekf = np.array([[1e-3, 0, 0], [0, 1e-3, 0], [0, 0, 1e-5]])
-    R_ekf = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-3]])
+    Q_ekf = np.array([[1e-1, 0, 0], [0, 1e-1, 0], [0, 0, 1e-2]])
+    R_ekf = np.array([[1e-4, 0, 0], [0, 1e-4, 0], [0, 0, 1e-4]])
     # J_w = np.eye(3)
-    x0_ekf = 0.3
+    x0_ekf = 0.1
 
     def __init__(self):
 
-        self.P = 1e-4*np.eye(3)  #uncertainty in initial condition
-        self.dt_ekf = 0.01
+        self.P = 1e-6*np.eye(3)  #uncertainty in initial condition
+        self.dt_ekf = 0.3
 
         
     def state_update(self, snowbot, measurement):
@@ -218,56 +210,75 @@ class SensorFusion:
         snowbot.state.x = state_est[0,0]; snowbot.state.y = state_est[1,0]; snowbot.state.theta = state_est[2,0]; 
 
 
+###---- Class that contains path information -----####
+class Path:
+
+    def __init__(self):
+##
+        self.a_el1 = 3; #self.a_el2 = 4  # major axis
+        self.b_el1 = 2; #self.b_el2 = 2  # minor axis
+        self.n_spacing = 400
+
+        self.x_d = np.concatenate( (np.linspace(-self.a_el1, self.a_el1, self.n_spacing) ,\
+        np.linspace(self.a_el1, -self.a_el1, self.n_spacing) ) , axis = 0 )      #needs to be a 1D array
+        self.y_d = np.concatenate( (self.b_el1*np.sqrt(1 - np.square(self.x_d[0:self.n_spacing]/self.a_el1 ) ) , \
+        -self.b_el1*np.sqrt(1 - np.square(self.x_d[self.n_spacing:]/self.a_el1 ) ) ) , axis=0)
+
+        
+        # self.n_spacing = 100
+        # self.x_d = np.concatenate( (np.linspace(-2.286, 3.25, self.n_spacing) ,\
+        #  np.linspace(3.25, -2.286, self.n_spacing) ) , axis = 0 )     #needs to be a 1D array
+        # self.y_d = np.zeros(2*self.n_spacing)
+
+
 ###---- Measurement state  -----####
 class Measurement:
-# in actual hardware replace snowbot by arduino serialisation
-    def __init__(self, snowbot):
 
-        # x_init, y_init, theta_init = arduino.serialisation()
-        # self.x = x_init
-        # self.y = y_init
-        # self.theta = theta_init
-        self.x = snowbot.state.x + np.random.normal(0, 0.01, 1)
-        self.y = snowbot.state.y + np.random.normal(0, 0.01, 1)
-        self.theta = snowbot.state.theta + np.random.normal(0, 0.001, 1)
+	def __init__(self, arduino, mpu):
+            self.x, self.y = arduino.getLocn()
+            self.theta = mpu.getYaw()
 
-    def measurementUpdate(self, snowbot):
-
-        # x_obs, y_obs, theta_obs = arduino.serialisation()
-        self.x = snowbot.state.x + np.random.normal(0, 0.1, 1)
-        self.y = snowbot.state.y + np.random.normal(0, 0.1, 1)
-        self.theta = snowbot.state.theta + np.random.normal(0, 0.001, 1)
+	def measurementUpdate(self, arduino, mpu):
+            self.x, self.y = arduino.getLocn()
+            self.theta = mpu.getYaw()
 
 
-######---- Main script -----#####
-if __name__ == '__main__':
-    
-    count=0
-    snowbot = SnowBot(0, -10 ,1.57)
-    path = Path()
-    controller = Controller(snowbot, path)    
-    measurement =Measurement(snowbot)
-    sensorfusion = SensorFusion()
 
-    x_list = []; y_list =[]; theta_list = []; w_l_list = []; w_r_list = []
-    n_ct = 7000
+###---- Arduino (all info from Arduino)  -----####
+class Arduino:
 
-    while count <n_ct:
+	def __init__(self, ser):
+            self.x = 0.0; self.y = 0.0; self.z = 0.0; self.conf = 0; self.flag = 0
+            ser.reset_input_buffer()
+            self.serialisation(ser)
 
-        measurement.measurementUpdate(snowbot)
-        sensorfusion.state_update(snowbot, measurement)
-        controller.control_update(snowbot, path)
-        snowbot.state.x , snowbot.state.y , snowbot.state.theta = simulator(snowbot, controller)
-        x_list.append(snowbot.state.x); y_list.append(snowbot.state.y); theta_list.append(snowbot.state.theta)
-        w_l_list.append( snowbot.w_l ); w_r_list.append( snowbot.w_r )
-        count+=1
+	def getLocn(self):
+            return self.x, self.y #, self.theta
 
-    # print(path.x_d)
-    plt.plot(x_list, y_list)
-    plt.show()
+	def serialisation(self, ser):
+            while(1):
+                ser.reset_input_buffer()
+                inData = ser.readline().decode('ascii')
+##                print('serial data', inData)
+                inData = inData.replace('\r\n',"")
+                if 'Init' not in inData:
+                    # print(inData)
+                    data = inData.split(',')
+                    if len(data)==5:
+                        # print(len(data))
+                        # print(data)
+                        x = float(data[0])
+                        y = float(data[1])
+                        z = float(data[2])
+                        conf = float(data[3])
+                        flag = int(data[4])
+                        break
+                        
+                    else:
+                        continue
+                else:
+                    continue
 
-    plt.plot(np.arange( 0, n_ct ), w_l_list, 'g--')
-    plt.show()
+            self.x = x; self.y = y; self.z = z; self.conf = conf; self.flag = flag
+##            print('Bot thinks Serial is ',self.x, self.y)
 
-    plt.plot(np.arange( 0, n_ct ), w_r_list, 'r--')
-    plt.show()
