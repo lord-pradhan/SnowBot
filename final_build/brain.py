@@ -7,12 +7,12 @@ import time
 ###---- Brain Class -----####
 class Brain:
 
-	def __init__(self, snowbot):
+	def __init__(self):
 		
-		self.checkEMButton = 0
-		self.checkReset = 0
+		# self.checkEMButton = 0
+		# self.checkReset = 0
 		self.state = 'init'
-		self.snowbot.plow = 0 #over i2c
+		# self.snowbot.plow = 0 #over i2c
 		self.mark = 0
 		# self.ct1 = 0
 
@@ -55,11 +55,13 @@ class Brain:
         self.y_post = self.snowbot.state.y
         self.theta_post = self.snowbot.state.theta
         self.state = 'think'
+        print('go to think')
 
 
 	def thinkProc(self, ser, mpu):
 
 		self.state = 'driveD'
+		print('go to driveD')		
 
 	def driveDProc(self, serial_input):
 
@@ -82,9 +84,13 @@ class Brain:
 
 		#check if reached boundary
 		if (self.controller.in_flag == 1):
+			print('reached boundary')
 			self.snowbot.w_l = 0; self.snowbot.w_r = 0
 			self.state = 'driveE'
+			print('go to driveE')
 			self.gamma_min = self.controller.gamma_prev
+			self.start = self.gamma_min
+			self.looped = 0
 			self.snowbot.plow = 1 #write to i2c
 
 	def driveEProc(self, serial_input):
@@ -106,21 +112,34 @@ class Brain:
 
 		self.controller.control_update(self.snowbot, self.path, self.mark)
 
-		# check if finished loop
-		if self.controller.gamma_prev - self.gamma_min > 2*len(self.path.x_d):
+		# count number of times loop traversed
+		if self.controller.gamma_prev == self.start - 1:
+			self.start -= 1
+			self.looped += 1
 
+		# check if finished loop
+		if self.looped > 2:
+
+			print('finished 1 loop')
 			# check if reached innermost loop
-			if self.mark >3:
+			if self.mark >4:
 				self.state = 'goHome'
+				print('time to go home')
 				self.snowbot.w_l = 0; self.snowbot.w_r = 0
 
 			else:
-				self.mark -= 1
+				self.mark += 1
+				self.controller.dumped_flag = 0
+				print('move to inner loop')
+				self.start = self.controller.gamma_prev
+				self.looped = 0
+
 
 		# check if reached dump location
-		if self.controller.gamma_prev - self.gamma_min > len(self.path.x_d) \
-		and np.isin(wrapPath(self.controller.gamma_prev), Path(self.snowbot,self.mark).gamma_dump):
-			
+		if self.controller.dumped_flag == 0 and self.looped > 1 and \
+		np.isin(wrappath(self.controller.gamma_prev, self.path), Path(self.snowbot,self.mark).gamma_dump):
+
+			print('move to dump')
 			self.state = 'dump'
 			self.snowbot.w_l = 0; self.snowbot.w_r = 0
 			self.gamma_min = self.controller.gamma_prev
@@ -136,6 +155,7 @@ class Brain:
 
 		else:
 			self.state = 'driveE'
+			print('done w dump')
 
 	def goHomeProc(self, serial_input):
 

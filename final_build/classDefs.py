@@ -46,14 +46,14 @@ class Controller:
     def __init__(self, snowbot, path, mark):
 
         #control parameters
-        self.L = 0.4  #bounding box length
+        self.L = 0.7  #bounding box length
         self.k_p = 3.0  #gain
         # self.dt_ctrl = 0.05
         self.v_target = 0.3
         self.w_max = 45*np.pi*2/60.0
         self.v_bot = min(self.w_max*snowbot.r, self.v_target)
         self.block = np.floor(len(path.x_d)/10)
-        self.search = np.floor(len(path.x_d)/8)  #look-ahead for search
+        self.search = np.floor(len(path.x_d)/4)  #look-ahead for search
 
         self.x_track = 0; self.y_track = 0
 
@@ -80,13 +80,14 @@ class Controller:
         v_bot = self.v_bot
         # plow transform
         X_plow = x + x_p * np.cos( theta );  Y_plow = y + x_p * np.sin( theta )
+        k_p=self.k_p
 
         if mode ==0: # normal operation
 
             #initialise variables
             gamma_prev = self.gamma_prev
             
-            L = self.L; k_p=self.k_p; search=self.search
+            L = self.L; search=self.search
             block = self.block
 
             # Nonlinear guidance law path-following controller
@@ -164,8 +165,7 @@ class Controller:
                     print('atan2 not defined')
 
                 else:
-                    theta_ref = np.arctan2( Path(snowbot, mark).y_d[gamma_vtp] - Y_plow\
-                     , Path(snowbot, mark).x_d[gamma_vtp] - X_plow )
+                    theta_ref = np.arctan2( y_d_ref[gamma_vtp] - Y_plow, x_d_ref[gamma_vtp] - X_plow )
                     deltad = theta - theta_ref
 
                 w_r = float(( v_bot - k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
@@ -179,9 +179,9 @@ class Controller:
         # go home manouver
         else:
             dist = np.array([X_plow, Y_plow]).T - np.array([snowbot.home_x,snowbot.home_y ]).T
-            d_home = np.sum(np ** 2, axis=1)
+            d_home = np.sum(dist ** 2, axis=1)
             if (d_home > 0.1):
-                theta_ref = np.arctan2( y_d[gamma_vtp] - Y_plow , x_d[gamma_vtp] - X_plow )
+                theta_ref = np.arctan2( snowbot.home_y - Y_plow , snowbot.home_x - X_plow )
                 deltad = theta - theta_ref
                 w_r = float(( v_bot - k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
                 w_l = float(( v_bot + k_p*snowbot.c*wrap2pi(deltad) )/snowbot.r)
@@ -271,7 +271,7 @@ class Path:
 
     def __init__(self, snowbot, mark=1):
 
-        self.a_boundary = 8; self.b_boundary = 6
+        self.a_boundary = 6; self.b_boundary = 4
 
         self.a_el1 = self.a_boundary - mark*snowbot.c;  # major axis
         self.b_el1 = self.b_boundary - mark*snowbot.c;  # minor axis
@@ -286,8 +286,8 @@ class Path:
         self.gamma_dump = np.arange(250,300)
 
         if mark==0:
-            self.x_d = self.x_d[gamma_dump]
-            self.y_d = self.y_d[gamma_dump]
+            self.x_d = self.x_d[self.gamma_dump]
+            self.y_d = self.y_d[self.gamma_dump]
 
 
 ###---- Measurement state  -----####
