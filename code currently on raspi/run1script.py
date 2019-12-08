@@ -3,23 +3,26 @@ import numpy.linalg as LA
 # from usefulFuncs import *
 ##from classDefs import *
 from brain import *
-##from DriveArduino import *
-##from MPU6050 import *
+from DriveArduino import *
+
+from IMUArduino import *
 import serial
 import time
 
 if __name__ == '__main__':
 
-	brain = Brain()
-	theta_init = 90*np.pi/180.0
-	# brain.state = 'init'
-	ser = serial.Serial('/dev/ttyS0', baudrate = 115200, timeout=1) # COM port may need to be changed - REMEMBER
-	mpu = MPU6050(theta_init)
-	mpu.setup()
-	drivearduino =  DriveArduino(8)
-	start = time.time()
+        brain = Brain()
+        ##	theta_init = 90*np.pi/180.0
+        brain.state = 'init'
+        ser = serial.Serial('/dev/ttyS0', baudrate = 115200, timeout=1) # COM port may need to be changed - REMEMBER
 
-	while (True):
+        ##	mpu = MPU6050(theta_init)
+
+        mpu = IMUArduino()
+        drivearduino = DriveArduino(8)
+        start = time.time()
+
+        while (True):
 
                 # if (brain.checkEMButton == 1):
                 # 	brain.EMProc()
@@ -37,7 +40,7 @@ if __name__ == '__main__':
 
                 elif brain.state == 'driveD':
                         time.sleep(0.3)
-                        brain.driveDProc(ser,mpu)
+                        brain.driveDProc(ser,mpu, drivearduino)
                         print('drive done')
 
                 # send control input back to system
@@ -56,6 +59,12 @@ if __name__ == '__main__':
                         str_send = '_BOTPOS,' + str(round(brain.controller.x_track,2)) + ',' + str(round(brain.controller.y_track,2)) + ',' + \
                                    str(round(brain.x_pre,2)) + ',' + str(round(brain.y_pre,2)) + ',' + str(round(brain.theta_pre,3)) + ',' +\
                                    str(round(brain.x_post,2)) + ',' + str(round(brain.y_post,2)) + ',' + str(round(brain.theta_post,3))+ '\n';
+
+                        
+##                        str_send = '_BOTPOS,' + str(round(brain.controller.x_track,2)) + ',' + str(round(brain.controller.y_track,2)) + ',' + \
+##                        str(round(brain.x_pre,2)) + ',' + str(round(brain.y_pre,2)) + ',' + str(round(brain.theta_pre,3)) + ',' +\
+##                        str(0) + ',' + str(0) + ',' + str(round(wrap2pi(mpu.normMagAngle),3))+ '\n';
+
                         ser.write(bytes(str_send.encode('ascii')))
                         start = time.time()
 

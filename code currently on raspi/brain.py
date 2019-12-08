@@ -10,8 +10,8 @@ class Brain:
 
 	def __init__(self):
 		
-                self.checkEMButton = 0
-                self.checkReset = 0
+                # self.checkEMButton = 0
+                # self.checkReset = 0
                 self.state = 'init'
                 # self.ct1 = 0
 
@@ -47,7 +47,7 @@ class Brain:
 
 		self.state = 'driveD'
 
-	def driveDProc(self, ser, mpu):
+	def driveDProc(self, ser, mpu, drivearduino):
 
                 self.arduino.serialisation(ser)
                 self.measurement.measurementUpdate(self.arduino, mpu)
@@ -64,5 +64,5 @@ class Brain:
                 self.theta_post = self.snowbot.state.theta
 
 
-                self.controller.control_update(self.snowbot, self.boundary)
+                self.controller.control_update(self.snowbot, self.boundary, drivearduino)
 

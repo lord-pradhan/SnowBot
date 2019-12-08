@@ -3,7 +3,7 @@ import numpy.linalg as LA
 from usefulFuncs import *
 ##from brain import *
 from DriveArduino import *
-from MPU6050 import *
+from IMUArduino import *
 
 
 
@@ -43,15 +43,16 @@ class SnowBot:
 class Controller:
 
     #control parameters
-    L = 0.4  #bounding box length
-    k_p = 3  #gain
-    v_target = 0.3
+    L = 0.2  #bounding box length
+    k_p = 1  #gain
+    v_target = 2
 
     def __init__(self, snowbot, path):
 
         self.dt_ctrl = 0.3
-        self.w_max = 45*np.pi*2/60.0
-        self.v_bot = min(self.w_max*snowbot.r, self.v_target)
+        self.w_max_l = 45*np.pi*2/60.0
+        self.w_max_r = 45*np.pi*2/60.0
+
         self.block = np.floor(len(path.x_d)/10)
         self.search = np.floor(len(path.x_d)/8)  #look-ahead for search
 
@@ -63,15 +64,25 @@ class Controller:
         temp, self.gamma_prev = closest_node(X_plow, Y_plow, np.array([path.x_d, path.y_d]).T )        
         
 
-    def control_update(self, snowbot, path):
+    def control_update(self, snowbot, path, drivearduino):
 
         #initialise variables
         gamma_prev = self.gamma_prev
         x = snowbot.state.x; y = snowbot.state.y; theta = snowbot.state.theta
         x_p = snowbot.x_p
-        v_bot = self.v_bot; L = self.L; k_p=self.k_p; search=self.search
+        L = self.L; k_p=self.k_p; search=self.search
         block = self.block
 
+        self.v_bot = min((self.w_max_l+self.w_max_r)*snowbot.r/2.0, self.v_target)
+        v_bot = self.v_bot
+
+        if drivearduino.pwm_max[0]:
+            self.w_max_r =  ( drivearduino.rpm[0] + drivearduino.rpm[1] )*30 / (np.pi*2.0)
+            
+        if drivearduino.pwm_max[1]:
+            self.w_max_l =  ( drivearduino.rpm[2] + drivearduino.rpm[3] )*30 / (np.pi*2.0)
+
+        
         # Nonlinear guidance law path-following controller
 
         x_d_ref=Path().x_d;  y_d_ref=Path().y_d
@@ -130,17 +141,17 @@ class Controller:
 
 
         #include RPM thresholds
-        if w_r > self.w_max:
-            w_r = self.w_max
+        if w_r > self.w_max_r:
+            w_r = self.w_max_r
 
-        if w_r < -self.w_max:
-            w_r = -self.w_max
+        if w_r < -self.w_max_r:
+            w_r = -self.w_max_r
 
-        if w_l > self.w_max:
-            w_l = self.w_max
+        if w_l > self.w_max_l:
+            w_l = self.w_max_l
 
-        if w_l < -self.w_max:
-            w_l = -self.w_max
+        if w_l < -self.w_max_l:
+            w_l = -self.w_max_l
 
         snowbot.w_r = w_r
         snowbot.w_l = w_l
@@ -152,26 +163,31 @@ class Controller:
 class SensorFusion:
 
     #EKF parameters
-    Q_ekf = np.array([[1e-3, 0, 0], [0, 1e-3, 0], [0, 0, 1e-3]])
-    R_ekf = np.array([[2e-2, 0, 0], [0, 2e-2, 0], [0, 0, 1e-1]])
+    Q_ekf = np.array([[1e-3, 0, 0], [0, 1e-3, 0], [0, 0, 1e-4]])
+    R_ekf = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-2]])
     # J_w = np.eye(3)
-    x0_ekf = 0.3
+    x0_ekf = 0.0
 
     def __init__(self):
 
         self.P = 1e-6*np.eye(3)  #uncertainty in initial condition
         self.dt_ekf = 0.3
+        self.time = time.time()
 
         
     def state_update(self, snowbot, measurement):
 
         # all req parameters
+        currTime = time.time()
+        dt = currTime - self.time
+        self.time = currTime
         w_l = snowbot.w_l; w_r = snowbot.w_r
         r = snowbot.r; c = snowbot.c
-        x_prev = float(snowbot.state.x); y_prev = float(snowbot.state.y); theta_prev = float(snowbot.state.theta)
-        x_meas = float(measurement.x); y_meas = float(measurement.y); theta_meas = float(measurement.theta)
-        dt = self.dt_ekf; Q_ekf=self.Q_ekf; R_ekf = self.R_ekf; x0_ekf = self.x0_ekf
+        x_prev = float(snowbot.state.x); y_prev = float(snowbot.state.y); theta_prev = wrap2pi(float(snowbot.state.theta))
+        x_meas = float(measurement.x); y_meas = float(measurement.y); theta_meas = wrap2pi(float(measurement.theta))
+        Q_ekf=self.Q_ekf; R_ekf = self.R_ekf; x0_ekf = self.x0_ekf
         P_prev = self.P # updated P at prev step
+        #dt = self.dt_ekf
 
         # concatenate states
         prev_state = np.array([[x_prev],[y_prev],[theta_prev]])
@@ -180,13 +196,13 @@ class SensorFusion:
         # state a-priori estimate
         a_priori = np.array([[x_prev + dt*( (w_l+w_r)*np.cos(theta_prev)*r/(2.0) + (w_r - w_l)*np.sin(theta_prev)*r*x0_ekf/(2.0*c) )] \
         , [ y_prev + dt*( (w_l+w_r)*np.sin(theta_prev)*r/(2.0) - (w_r - w_l)*np.cos(theta_prev)*r*x0_ekf/(2.0*c) ) ],\
-        [ theta_prev + dt*(w_r - w_l)*r/(2.0*c) ]])
+        [ wrap2pi(theta_prev + dt*(w_r - w_l)*r/(2.0*c) )]])
 
         # calculate jacobian
 
         # print(theta_prev)
-        F_prev = np.array( [[ 1, 0, -(w_l+w_r)*r*np.sin(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.cos(theta_prev)/(2.0*c) ],\
-        [ 0, 1, (w_l+w_r)*r*np.cos(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.sin(theta_prev)/(2.0*c) ],[ 0,0,1 ]] )
+        F_prev = np.array( [[ 1, 0, dt*(-(w_l+w_r)*r*np.sin(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.cos(theta_prev)/(2.0*c) )],\
+        [ 0, 1, dt*((w_l+w_r)*r*np.cos(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.sin(theta_prev)/(2.0*c) )],[ 0,0,1 ]] )
 
         # a-priori P
         # print(F_prev, P_prev)
@@ -196,7 +212,9 @@ class SensorFusion:
         K_kal = P_ap @ LA.inv( P_ap + R_ekf )
 
         # next state estimate
-        state_est = a_priori + K_kal @ ( measured_state - a_priori )
+##        state_est = a_priori + K_kal @ ( measured_state - a_priori )
+        state_est = a_priori + K_kal @ ( np.array([[measured_state[0,0] - a_priori[0,0] ], [ measured_state[1,0] - a_priori[1,0] ], \
+                                                   [ wrap2pi(measured_state[2,0] - a_priori[2,0]) ] ]) )
 
         #update P
         P_update = ( np.eye(3) - K_kal ) @ P_ap
@@ -206,6 +224,7 @@ class SensorFusion:
 
 
 ###---- Class that contains path information -----####
+
 class Path:
 
     def __init__(self):
@@ -231,11 +250,11 @@ class Measurement:
 
 	def __init__(self, arduino, mpu):
             self.x, self.y = arduino.getLocn()
-            self.theta = mpu.getYaw()
+            self.theta = wrap2pi(mpu.getYaw())
 
 	def measurementUpdate(self, arduino, mpu):
             self.x, self.y = arduino.getLocn()
-            self.theta = mpu.getYaw()
+            self.theta = wrap2pi(mpu.getYaw())
 
 
 

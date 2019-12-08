@@ -63,7 +63,7 @@ class Brain:
 		self.state = 'driveD'
 		print('go to driveD')		
 
-	def driveDProc(self, serial_input):
+	def driveDProc(self, ser, mpu, drivearduino):
 
 		self.arduino.serialisation(ser)
 		self.measurement.measurementUpdate(self.arduino, mpu)
@@ -80,7 +80,7 @@ class Brain:
         self.y_post = self.snowbot.state.y
         self.theta_post = self.snowbot.state.theta
 
-		self.controller.control_update(self.snowbot, self.path, self.mark)
+		self.controller.control_update(self.snowbot, self.path, drivearduino, self.mark)
 
 		#check if reached boundary
 		if (self.controller.in_flag == 1):
@@ -93,7 +93,7 @@ class Brain:
 			self.looped = 0
 			self.snowbot.plow = 1 #write to i2c
 
-	def driveEProc(self, serial_input):
+	def driveEProc(self, ser, mpu, drivearduino):
 
 		self.arduino.serialisation(ser)
 		self.measurement.measurementUpdate(self.arduino, mpu)
@@ -110,7 +110,7 @@ class Brain:
         self.y_post = self.snowbot.state.y
         self.theta_post = self.snowbot.state.theta
 
-		self.controller.control_update(self.snowbot, self.path, self.mark)
+		self.controller.control_update(self.snowbot, self.path, drivearduino, self.mark)
 
 		# count number of times loop traversed
 		if self.controller.gamma_prev == self.start - 1:
@@ -127,6 +127,7 @@ class Brain:
 				print('time to go home')
 				self.snowbot.w_l = 0; self.snowbot.w_r = 0
 
+			# move in
 			else:
 				self.mark += 1
 				self.controller.dumped_flag = 0
@@ -145,25 +146,25 @@ class Brain:
 			self.gamma_min = self.controller.gamma_prev
 
 
-	def dumpProc(self, serial_input):
+	def dumpProc(self, ser, mpu, drivearduino):
 
 		if self.controller.dumped_flag == 0:
-			self.arduino.serialisation(serial_input)
-			self.measurement = measurementUpdate(self.arduino)
+			self.arduino.serialisation(ser)
+			self.measurement = measurementUpdate(self.arduino, mpu)
 			self.sensorfusion.state_update(self.snowbot, self.measurement)
-			self.controller.control_update(self.snowbot, self.gamma_min, self.mark, mode=1)
+			self.controller.control_update(self.snowbot, self.path, drivearduino, self.mark, mode=1)
 
 		else:
 			self.state = 'driveE'
 			print('done w dump')
 
-	def goHomeProc(self, serial_input):
+	def goHomeProc(self, ser, mpu, drivearduino):
 
 		if self.controller.home_flag == 0:
-			self.arduino.serialisation(serial_input)
-			self.measurement = measurementUpdate(self.arduino)
+			self.arduino.serialisation(ser)
+			self.measurement = measurementUpdate(self.arduino, mpu)
 			self.sensorfusion.state_update(self.snowbot, self.measurement)
-			self.controller.control_update(self.snowbot, self.gamma_min, self.mark, mode=2)
+			self.controller.control_update(self.snowbot, self.path, drivearduino, self.mark, mode=2)
 
 		else:
 			print("reached home")
