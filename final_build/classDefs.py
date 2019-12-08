@@ -246,8 +246,8 @@ class SensorFusion:
         # calculate jacobian
 
         # print(theta_prev)
-        F_prev = np.array( [[ 1, 0, -(w_l+w_r)*r*np.sin(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.cos(theta_prev)/(2.0*c) ],\
-        [ 0, 1, (w_l+w_r)*r*np.cos(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.sin(theta_prev)/(2.0*c) ],[ 0,0,1 ]] )
+        F_prev = np.array( [[ 1, 0, dt*(-(w_l+w_r)*r*np.sin(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.cos(theta_prev)/(2.0*c) )],\
+        [ 0, 1, dt*((w_l+w_r)*r*np.cos(theta_prev)/(2.0) + (w_r-w_l)*r*x0_ekf*np.sin(theta_prev)/(2.0*c)) ],[ 0,0,1 ]] )
 
         # a-priori P
         # print(F_prev, P_prev)
