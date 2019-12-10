@@ -78,7 +78,7 @@ class IMUArduino:
             angle_after = self.li_act[3] + self.li_slopes[2]*(self.li_act[2]-self.li_cal[2]) + self.li_slopes[2]*(angle_before+180)
         elif(self.li_cal[3] <= angle_before < self.li_cal[0]):
             angle_after = self.li_slopes[3] * (angle_before - self.li_cal[3]) + self.li_act[4]
-##        print(angle_after)
+        print(angle_after)
         self.magAngle = angle_after*np.pi/180.0
         self.normMagAngle = self.magAngle + self.Noffset
     
@@ -106,7 +106,7 @@ if __name__ == '__main__':
 ##        imu.update()
 ##        print(imu.mag[0], ',', imu.mag[1])
 
-    print(np.__version__)
+    
     avg_sum = 0
     cnt = 1
     while(1):

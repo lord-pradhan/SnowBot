@@ -25,7 +25,6 @@ def simulator( snowbot, controller):
 
 	return x_out, y_out, theta_out
 
-
 # vectorized find_nearest point
 def closest_node(X, Y, traj):
     point = np.array([X, Y])

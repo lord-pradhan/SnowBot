@@ -27,14 +27,9 @@ class DriveArduino:
         (self.pi, self.handle) = self._open_i2c()
         self.rpm_to_enc = self.ticks_per_rev * self.ints_per_tick * self.samp_period / 60.0
 
-        self.enc_sp_data = [0, 0, 0, 0]
         self.rpm = np.array([0, 0, 0, 0]) # right, right, left, left
         self.pwm = np.array([0, 0, 0, 0]) # right, right, left, left
         self.pwm_max = [0, 0] # right, left
-
-        self.plow_state = 1
-        self.plow_state_data = [0]; # 0 - up, 1 - down
-        
     
     def _open_i2c(self):
         pi = pigpio.pi()
@@ -68,10 +63,6 @@ class DriveArduino:
             except:
                 print('i2c read arduino try except trigerred')
                 continue
-
-    def write_all(self):
-        data = self.plow_state_data + self.enc_sp_data
-        self._write_bytes(data)
     
     def set_rpm(self, rpm_arr):
         """Set angular velocity for each wheel in RPM.
@@ -82,21 +73,7 @@ class DriveArduino:
         enc_arr = np.around(rpm_arr * self.rpm_to_enc).astype('int8')
         #print('Arduino I2C: ', rpm_arr * self.rpm_to_enc)
         data = np.bitwise_and(enc_arr, 0xff).tolist()
-        self.enc_sp_data = data
-        self.write_all()
-##        self._write_bytes(data)
-
-    def raisePlow(self):
-        self.plow_state = 0
-        self.plow_state_data = [2]
-        self.write_all()
-        self.plow_state_data = [0]
-
-    def lowerPlow(self):
-        self.plow_state = 1
-        self.plow_state_data = [1]
-        self.write_all()
-        self.plow_state_data = [0]
+        self._write_bytes(data)
     
     def update(self):
         (count, data) = self._read_bytes(12)
@@ -132,12 +109,3 @@ class DriveArduino:
         self.pi.i2c_close(self.handle)
         self.pi.stop()
 ###
-
-if(__name__ == '__main__'):
-    from time import sleep
-    drive = DriveArduino(0x08)
-    while(1):
-        drive.raisePlow()
-        sleep(20)
-        drive.lowerPlow()
-        sleep(20)
