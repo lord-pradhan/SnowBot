@@ -10,8 +10,8 @@ class Brain:
 
 	def __init__(self):
 		
-                # self.checkEMButton = 0
-                # self.checkReset = 0
+                self.checkEMButton = 0
+                self.checkReset = 0
                 self.state = 'init'
                 # self.ct1 = 0
 

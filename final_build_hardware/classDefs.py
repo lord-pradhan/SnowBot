@@ -43,15 +43,15 @@ class SnowBot:
 class Controller:
 
     #control parameters
-    L = 0.2  #bounding box length
+    L = 0.5  #bounding box length
     k_p = 1  #gain
     v_target = 2
 
     def __init__(self, snowbot, path):
 
         self.dt_ctrl = 0.3
-        self.w_max_l = 45*np.pi*2/60.0
-        self.w_max_r = 45*np.pi*2/60.0
+        self.w_max_l = 50*np.pi*2/60.0
+        self.w_max_r = 50*np.pi*2/60.0
 
         self.block = np.floor(len(path.x_d)/10)
         self.search = np.floor(len(path.x_d)/8)  #look-ahead for search
@@ -163,8 +163,8 @@ class Controller:
 class SensorFusion:
 
     #EKF parameters
-    Q_ekf = np.array([[1e-3, 0, 0], [0, 1e-3, 0], [0, 0, 1e-4]])
-    R_ekf = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-2]])
+    Q_ekf = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-3]])
+    R_ekf = np.array([[1e-2, 0, 0], [0, 1e-2, 0], [0, 0, 1e-3]])
     # J_w = np.eye(3)
     x0_ekf = 0.0
 

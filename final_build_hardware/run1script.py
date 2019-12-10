@@ -41,7 +41,7 @@ if __name__ == '__main__':
                 elif brain.state == 'driveD':
                         time.sleep(0.3)
                         brain.driveDProc(ser,mpu, drivearduino)
-                        print('drive done')
+##                        print('drive done')
 
                 # send control input back to system
                 print('control inputs LR', brain.snowbot.w_l, brain.snowbot.w_r)
